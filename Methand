@@ -1,0 +1,103 @@
+// Define the region of interest - South Asia, Here you can add your area of interest as well
+var southAsia = ee.Geometry.Polygon([
+  [60.0, 5.0], // Bottom left corner
+  [60.0, 40.0], // Top left corner
+  [100.0, 40.0], // Top right corner
+  [100.0, 5.0]  // Bottom right corner
+]);
+
+// Define time range for the analysis, You can also change your time of interest 
+var startDate = '2024-05-01';
+var endDate = '2024-11-10';
+
+// Load Sentinel-5P CH₄ dataset
+var methane = ee.ImageCollection('COPERNICUS/S5P/OFFL/L3_CH4')
+  .filterBounds(southAsia)
+  .filterDate(startDate, endDate)
+  .select('CH4_column_volume_mixing_ratio_dry_air');
+
+// Calculate the mean methane concentration over the time period
+var methaneMean = methane.mean().clip(southAsia);
+
+// Define visualization parameters for methane concentration
+var methaneVis = {
+  min: 1750,
+  max: 1950,
+  palette: ['blue', 'green', 'yellow', 'orange', 'red']
+};
+
+// Add the mean methane layer to the map
+Map.centerObject(southAsia, 4);
+Map.addLayer(methaneMean, methaneVis, 'Mean Methane Concentration (May - Nov 2024)');
+
+// Add legend
+function addLegend() {
+  var legend = ui.Panel({
+    style: {
+      position: 'top-right',
+      padding: '8px 15px'
+    }
+  });
+
+  var legendTitle = ui.Label({
+    value: 'Methane Concentration (ppb)',
+    style: {
+      fontWeight: 'bold',
+      fontSize: '16px',
+      margin: '0 0 6px 0',
+      padding: '0'
+    }
+  });
+  
+  legend.add(legendTitle);
+
+  // Colors and labels for the legend
+  var palette = methaneVis.palette;
+  var labels = ['1750', '1800', '1850', '1900', '1950'];
+  
+  // Create legend items
+  for (var i = 0; i < palette.length; i++) {
+    var colorBox = ui.Label({
+      style: {
+        backgroundColor: palette[i],
+        padding: '8px',
+        margin: '0 0 4px 0'
+      }
+    });
+    
+    var description = ui.Label({
+      value: labels[i],
+      style: {
+        margin: '0 0 4px 6px'
+      }
+    });
+    
+    var legendRow = ui.Panel({
+      widgets: [colorBox, description],
+      layout: ui.Panel.Layout.Flow('horizontal')
+    });
+    
+    legend.add(legendRow);
+  }
+
+  Map.add(legend);
+}
+
+addLegend();
+
+// Optional: Export the image to Google Drive for further analysis
+Export.image.toDrive({
+  image: methaneMean,
+  description: 'Mean_Methane_SouthAsia_May_Nov_2024',
+  scale: 10000,
+  region: southAsia,
+  maxPixels: 1e13
+});
+
+// Display the map and print basic statistics for methane concentration
+print('Mean Methane Concentration (May - Nov 2024):', methaneMean.reduceRegion({
+  reducer: ee.Reducer.mean(),
+  geometry: southAsia,
+  scale: 10000,
+  maxPixels: 1e13
+}));
